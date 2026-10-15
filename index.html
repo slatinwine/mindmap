@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>思维导图 · 清水混凝土</title>
+<style>
+  :root{
+    --bg:#b3b0aa; --bg-deep:#a8a5a0;
+    --panel:#c9c6c0; --panel-2:#c0bdb7; --panel-3:#d3d0ca;
+    --line:#8f8c86; --line-soft:#a5a29c;
+    --ink:#292722; --ink-2:#57544d; --ink-3:#7c786f;
+    --field:#dcd9d3; --field-line:#9b988f;
+    --accent:#d9480f; --accent-2:#e8590c;
+    --font-ui:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    --font-disp:Georgia,"Times New Roman","STZhongsong","SimSun",serif;
+    --hard-shadow:2px 2px 0 rgba(24,22,18,.32);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--font-ui); color:var(--ink);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 279px, rgba(0,0,0,.045) 279px 280px),
+      repeating-linear-gradient(0deg, transparent 0 359px, rgba(0,0,0,.035) 359px 360px),
+      var(--bg);
+    overflow:hidden; user-select:none; -webkit-user-select:none;
+  }
+  #noise{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");}
+  #app{height:100%;display:flex;flex-direction:column}
+
+  /* ── 顶栏：混凝土板 ───────────────────────── */
+  #topbar{
+    display:flex;align-items:center;gap:18px;padding:9px 16px;flex-wrap:wrap;
+    background:linear-gradient(var(--panel-3),var(--panel));
+    border-bottom:1px solid var(--line); position:relative; z-index:10;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 6px rgba(24,22,18,.22);
+  }
+  #topbar::before,#topbar::after{
+    content:"";width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #8e8b85, #6f6c66 60%, #5a5751);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.3);
+    align-self:center;
+  }
+  #topbar::after{margin-left:auto}
+  .brand{display:flex;flex-direction:column;line-height:1.15;min-width:120px}
+  .brand-title{font-family:var(--font-disp);font-size:15px;letter-spacing:.32em;font-weight:600;color:var(--ink)}
+  .brand-sub{font-size:10px;letter-spacing:.24em;color:var(--ink-3);margin-top:2px}
+  .brand-sub b{color:var(--accent);font-weight:600}
+  .tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .grp{display:flex;gap:5px;padding:0 10px 0 0;border-right:1px solid var(--line-soft);margin-right:4px}
+  .grp:last-child{border-right:none}
+  .btn{
+    font-family:var(--font-ui);font-size:12.5px;color:var(--ink);
+    background:linear-gradient(var(--panel-3),var(--panel-2));
+    border:1px solid #83807a;border-radius:2px;padding:6px 11px;cursor:pointer;
+    box-shadow:var(--hard-shadow);letter-spacing:.05em;white-space:nowrap;
+    transition:transform .05s;
+  }
+  .btn:hover{transform:translate(-1px,-1px);box-shadow:3px 3px 0 rgba(24,22,18,.32);background:linear-gradient(#ddd9d3,var(--panel-3))}
+  .btn:active{transform:translate(1px,1px);box-shadow:none}
+  .btn:disabled{opacity:.45;cursor:default;transform:none;box-shadow:var(--hard-shadow)}
+  .btn.acc{border-color:#a33d12;color:#a33d12;font-weight:600}
+  .btn.acc:hover{background:linear-gradient(#f3d9cb,#e9c9b4)}
+  .btn .k{font-size:10px;color:var(--ink-3);margin-left:4px}
+
+  /* ── 画布区 ───────────────────────── */
+  #stage{flex:1;position:relative;overflow:hidden;background:
+    radial-gradient(rgba(60,56,48,.13) 1px, transparent 1.4px);
+    background-size:26px 26px;background-position:13px 13px;cursor:grab}
+  #stage.panning{cursor:grabbing}
+  #map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #map .node{cursor:pointer}
+  #map .node rect.box{transition:fill .08s}
+  #map .node:hover rect.box{fill:#e6e2db}
+  #map .node rect.sel{stroke:var(--accent);stroke-width:2.5}
+  #map .node.root:hover rect.box{fill:#54504a}
+  #map .tog{cursor:pointer}
+
+  /* 节点编辑框 */
+  #nodeEditor{
+    position:absolute;display:none;z-index:20;
+    background:#f4f2ee;border:2px solid var(--accent);outline:none;border-radius:2px;
+    font-family:var(--font-ui);color:var(--ink);text-align:center;vertical-align:middle;
+    resize:none;overflow:hidden;padding:2px 6px;box-shadow:3px 3px 0 rgba(24,22,18,.35);
+  }
+
+  /* ── 底部图签 ───────────────────────── */
+  #titleblock{
+    display:flex;background:var(--panel);border-top:1px solid var(--line);
+    position:relative;z-index:10;font-size:10.5px;
+  }
+  #titleblock .cell{
+    padding:5px 14px;border-right:1px solid var(--line-soft);letter-spacing:.06em;
+    display:flex;align-items:baseline;gap:8px;white-space:nowrap;
+  }
+  #titleblock .cell:last-child{border-right:none;margin-left:auto}
+  #titleblock .lab{font-size:9px;letter-spacing:.22em;color:var(--ink-3)}
+  #titleblock .val{color:var(--ink);font-weight:600}
+  #titleblock .val.disp{font-family:var(--font-disp);letter-spacing:.14em}
+
+  /* ── 下拉菜单 / 右键菜单 ───────────────────────── */
+  .menu{
+    position:absolute;z-index:60;min-width:186px;display:none;
+    background:linear-gradient(var(--panel-3),var(--panel));
+    border:1px solid #7f7b74;box-shadow:4px 4px 0 rgba(24,22,18,.35);
+    padding:4px 0;border-radius:2px;
+  }
+  .menu.show{display:block}
+  .menu .mi{
+    padding:7px 16px;font-size:12.5px;color:var(--ink);cursor:pointer;
+    display:flex;justify-content:space-between;gap:18px;letter-spacing:.04em;
+  }
+  .menu .mi:hover{background:#b5b1aa}
+  .menu .mi .k{color:var(--ink-3);font-size:10.5px}
+  .menu .mi.danger{color:#a33d12}
+  .menu .sep{height:1px;background:var(--line-soft);margin:4px 0}
+
+  /* ── 模态 ───────────────────────── */
+  #modalWrap{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(30,28,24,.42)}
+  #modalWrap.show{display:flex}
+  .modal{
+    background:linear-gradient(var(--panel-3),var(--panel));
+    border:1px solid #726f68;border-radius:2px;box-shadow:6px 6px 0 rgba(20,18,15,.45);
+    min-width:380px;max-width:640px;max-height:82vh;overflow:auto;position:relative;
+    padding:22px 26px 26px;
+  }
+  .modal h3{font-family:var(--font-disp);font-size:17px;letter-spacing:.22em;margin-bottom:4px}
+  .modal .sub{font-size:10px;letter-spacing:.24em;color:var(--ink-3);margin-bottom:16px}
+  .modal .row{display:flex;gap:8px;margin:10px 0;align-items:center}
+  .modal input[type=text]{
+    flex:1;background:var(--field);border:1px solid var(--field-line);border-radius:2px;
+    padding:8px 10px;font-size:12.5px;font-family:var(--font-ui);color:var(--ink);user-select:text;
+  }
+  .modal .note{font-size:11.5px;color:var(--ink-2);line-height:1.7;margin-top:10px}
+  .modal table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+  .modal td{padding:5px 8px;border-bottom:1px solid var(--line-soft)}
+  .modal td:first-child{font-family:Consolas,Menlo,monospace;white-space:nowrap;color:var(--ink-2)}
+  .modal .closeX{position:absolute;top:10px;right:12px;border:none;background:none;font-size:16px;cursor:pointer;color:var(--ink-3)}
+  .modal .closeX:hover{color:var(--ink)}
+  .meta-line{font-size:10.5px;letter-spacing:.16em;color:var(--ink-3);border-top:1px solid var(--line-soft);padding-top:10px;margin-top:16px}
+
+  #toast{
+    position:fixed;left:50%;bottom:64px;transform:translateX(-50%) translateY(20px);
+    background:#33302b;color:#ecebe7;font-size:12.5px;letter-spacing:.06em;
+    padding:9px 20px;border-radius:2px;box-shadow:3px 3px 0 rgba(20,18,15,.4);
+    opacity:0;pointer-events:none;transition:.22s;z-index:100;max-width:80vw;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-title">MIND&nbsp;MAP</div>
+      <div class="brand-sub">思维导图 <b>·</b> 清水混凝土</div>
+    </div>
+    <div class="tools">
+      <div class="grp">
+        <button class="btn" id="btnUndo" title="撤销 Ctrl+Z">↶ 撤销</button>
+        <button class="btn" id="btnRedo" title="重做 Ctrl+Y">↷ 重做</button>
+      </div>
+      <div class="grp">
+        <button class="btn" id="btnChild" title="添加子主题 Tab">＋ 子主题<span class="k">Tab</span></button>
+        <button class="btn" id="btnSibling" title="添加同级主题 Enter">＋ 同级<span class="k">Enter</span></button>
+        <button class="btn" id="btnDelete" title="删除 Del">删除<span class="k">Del</span></button>
+      </div>
+      <div class="grp">
+        <button class="btn" id="btnCollapse" title="折叠所有分支">全收</button>
+        <button class="btn" id="btnExpand" title="展开所有分支">全展</button>
+        <button class="btn" id="btnFit" title="视图适应窗口">适应</button>
+      </div>
+      <div class="grp">
+        <button class="btn" id="btnImport" title="导入 JSON / Markdown / FreeMind">导入</button>
+        <button class="btn" id="btnExport" title="导出为各种格式">导出 ▾</button>
+        <button class="btn acc" id="btnShare" title="生成包含全部数据的分享链接">◈ 分享</button>
+      </div>
+      <div class="grp">
+        <button class="btn" id="btnNew" title="新建导图">新建</button>
+        <button class="btn" id="btnHelp" title="快捷键与格式说明">?</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="stage">
+    <svg id="map" xmlns="http://www.w3.org/2000/svg">
+      <g id="world"><g id="gLinks"></g><g id="gNodes"></g></g>
+    </svg>
+    <textarea id="nodeEditor" spellcheck="false"></textarea>
+  </main>
+
+  <footer id="titleblock">
+    <div class="cell"><span class="lab">图名</span><span class="val disp">THINKING&nbsp;MAP</span></div>
+    <div class="cell"><span class="lab">节点</span><span class="val" id="tbNodes">—</span></div>
+    <div class="cell"><span class="lab">比例</span><span class="val" id="tbZoom">100%</span></div>
+    <div class="cell"><span class="lab">日期</span><span class="val" id="tbDate">—</span></div>
+    <div class="cell"><span class="lab">保存</span><span class="val" id="tbSaved">—</span></div>
+  </footer>
+</div>
+
+<div class="menu" id="exportMenu"></div>
+<div class="menu" id="ctxMenu"></div>
+
+<div id="modalWrap">
+  <div class="modal" id="shareModal">
+    <button class="closeX" data-close>✕</button>
+    <h3>SHARE / 分享</h3>
+    <div class="sub">CONCRETE&nbsp;MINDMAP&nbsp;·&nbsp;SHARE&nbsp;LINK</div>
+    <div class="row"><input type="text" id="shareInput" readonly placeholder="生成中…"><button class="btn" id="btnCopyLink">复制</button></div>
+    <div class="note" id="shareInfo"></div>
+    <div class="note">链接的 <b>#m=</b> 之后打包了整张导图的数据（自动压缩）。对方打开同一网页地址即可还原全部内容，无需服务器。若此文件在本地打开，请先部署到任意静态空间（如 GitHub Pages）再分享链接。</div>
+  </div>
+  <div class="modal" id="helpModal">
+    <button class="closeX" data-close>✕</button>
+    <h3>HELP / 帮助</h3>
+    <div class="sub">CONCRETE&nbsp;MINDMAP&nbsp;·&nbsp;MANUAL</div>
+    <table>
+      <tr><td>Tab</td><td>添加子主题并开始输入</td></tr>
+      <tr><td>Enter</td><td>添加同级主题并开始输入</td></tr>
+      <tr><td>F2 / 双击</td><td>编辑当前主题文字</td></tr>
+      <tr><td>Shift+Enter</td><td>文字内换行</td></tr>
+      <tr><td>Del / Backspace</td><td>删除主题（含子分支）</td></tr>
+      <tr><td>Space</td><td>折叠 / 展开分支</td></tr>
+      <tr><td>方向键</td><td>在分支间移动（上下取最近节点）</td></tr>
+      <tr><td>拖动节点到另一节点</td><td>改变从属关系（重新挂接）</td></tr>
+      <tr><td>Ctrl+C / Ctrl+V</td><td>复制分支 / 粘贴为当前主题的子分支</td></tr>
+      <tr><td>Ctrl+D</td><td>标记 / 取消重点（橙色钢筋标记）</td></tr>
+      <tr><td>Ctrl+Z / Ctrl+Y</td><td>撤销 / 重做</td></tr>
+      <tr><td>Ctrl+S</td><td>导出 JSON 文件</td></tr>
+      <tr><td>滚轮 / 拖空白处</td><td>缩放 / 平移视图</td></tr>
+    </table>
+    <div class="meta-line">FORMATS：导入支持 JSON（本工具格式）、Markdown 大纲、FreeMind .mm；导出另有 PNG 图像。内容自动保存在浏览器本地。</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="noise"></div>
+<input type="file" id="fileInput" accept=".json,.md,.markdown,.mm,.txt" style="display:none">
+
+<script>
+"use strict";
+/* ============================================================
+   思维导图 · 清水混凝土  —  单文件应用
+   编辑 / 导入导出 / 链接分享，全部离线可用
+   ============================================================ */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const FONT_UI   = '"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif';
+const FONT_ROOT = 'Georgia,"Times New Roman","STZhongsong","SimSun",serif';
+const NODE_FONT = "15px " + FONT_UI;
+const ROOT_FONT = "600 16px " + FONT_ROOT;
+const LH = 21, ROOT_LH = 24, PADX = 12, PADY = 8, GAPY = 14, GAPX = 76, MAXW = 280;
+const LS_KEY = "concrete-mindmap-doc";
+
+/* ── 状态 ─────────────────────────────── */
+let doc = null;                 // {title, root:{id,text,children,collapsed,mark}, nextId}
+let sel = null;                 // 选中的节点 id
+let view = { x: 0, y: 0, z: 1 };
+let pos = new Map();            // id -> {x,y,w,h,side,depth}
+let editing = null, editOld = "";
+let undoStack = [], redoStack = [], lastSnap = "";
+let clipBranch = null;
+let savedAt = "—";
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), svgEl = $("#map"), world = $("#world");
+const gLinks = $("#gLinks"), gNodes = $("#gNodes");
+const editor = $("#nodeEditor");
+const mctx = document.createElement("canvas").getContext("2d");
+
+function uid(){ return doc.nextId++; }
+function newNode(text){ return { id: uid(), text: text || "", children: [], collapsed: false, mark: false }; }
+function defaultDoc(){
+  let id = 0;
+  const mk = t => ({ id: ++id, text: t || "", children: [], collapsed: false, mark: false });
+  const root = mk("中心主题");
+  for (const t of ["主题一","主题二","主题三"]) root.children.push(mk(t));
+  return { app: "concrete-mindmap", version: 1, title: "未命名导图", root, nextId: id + 1 };
+}
+function find(id, node = doc.root, parent = null){
+  if (node.id === id) return { node, parent };
+  for (const c of node.children){ const r = find(id, c, node); if (r) return r; }
+  return null;
+}
+function walk(fn, node = doc.root){ fn(node); node.children.forEach(c => walk(fn, c)); }
+function isAncestor(a, id){ // a 的子树里是否包含 id
+  for (const c of a.children){ if (c.id === id || isAncestor(c, id)) return true; }
+  return false;
+}
+function visibleNodes(){
+  const out = [];
+  (function rec(n){ out.push(n); if (!n.collapsed) n.children.forEach(rec); })(doc.root);
+  return out;
+}
+function countNodes(){ let n = 0; walk(() => n++); return n; }
+function hiddenCount(n){
+  let c = 0;
+  (function rec(x){ x.children.forEach(y => { c++; rec(y); }); })(n);
+  return c;
+}
+
+/* ── 撤销 / 持久化 ─────────────────────── */
+function snapshot(){ return JSON.stringify(doc); }
+function commit(){
+  undoStack.push(lastSnap);
+  if (undoStack.length > 200) undoStack.shift();
+  redoStack.length = 0;
+  lastSnap = snapshot();
+  save(); render();
+}
+function undo(){
+  if (!undoStack.length) return toast("没有可撤销的操作");
+  redoStack.push(lastSnap);
+  doc = JSON.parse(undoStack.pop());
+  lastSnap = snapshot();
+  if (sel && !find(sel)) sel = doc.root.id;
+  save(); render();
+}
+function redo(){
+  if (!redoStack.length) return toast("没有可重做的操作");
+  undoStack.push(lastSnap);
+  doc = JSON.parse(redoStack.pop());
+  lastSnap = snapshot();
+  if (sel && !find(sel)) sel = doc.root.id;
+  save(); render();
+}
+function save(){
+  try { localStorage.setItem(LS_KEY, snapshot()); } catch(e){}
+  savedAt = new Date().toTimeString().slice(0,5);
+  $("#tbSaved").textContent = savedAt;
+}
+
+/* ── 文字测量与布局 ────────────────────── */
+function tokenize(s){
+  const res = []; let buf = "";
+  const CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/;
+  for (const ch of s){
+    if (CJK.test(ch)){ if (buf){ res.push(buf); buf = ""; } res.push(ch); }
+    else if (ch === " " || ch === "\t"){ if (buf){ res.push(buf); buf = ""; } res.push(" "); }
+    else buf += ch;
+  }
+  if (buf) res.push(buf);
+  return res;
+}
+function wrapText(text, maxW, font){
+  mctx.font = font;
+  const out = [];
+  for (const para of String(text || "").split("\n")){
+    if (para === ""){ out.push(""); continue; }
+    let line = "", lw = 0;
+    for (const t of tokenize(para)){
+      const tw = mctx.measureText(t).width;
+      if (line && lw + tw > maxW){
+        const done = line.replace(/\s+$/, "");
+        out.push(done); lw -= mctx.measureText(line).width; line = t; lw = tw;
+      } else { line += t; lw += tw; }
+    }
+    if (line) out.push(line.replace(/\s+$/,""));
+  }
+  if (!out.length) out.push("");
+  return out;
+}
+function measureAll(){
+  walk(n => {
+    const isRoot = n === doc.root;
+    const font = isRoot ? ROOT_FONT : NODE_FONT;
+    const lh = isRoot ? ROOT_LH : LH;
+    mctx.font = font;
+    const lines = wrapText(n.text, MAXW, font);
+    let w = 0;
+    for (const l of lines) w = Math.max(w, mctx.measureText(l).width);
+    n._lines = lines;
+    n._w = Math.max(48, Math.ceil(w) + PADX*2);
+    n._h = lines.length * lh + PADY*2;
+    n._lh = lh;
+  });
+}
+function layout(){
+  pos = new Map();
+  const ext = { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 };
+  const bump = (x, y, w, h) => {
+    ext.minX = Math.min(ext.minX, x - w/2); ext.maxX = Math.max(ext.maxX, x + w/2);
+    ext.minY = Math.min(ext.minY, y - h/2); ext.maxY = Math.max(ext.maxY, y + h/2);
+  };
+  function subH(n){
+    if (n.collapsed || !n.children.length) return n._h;
+    let s = 0;
+    for (const c of n.children) s += subH(c);
+    return Math.max(n._h, s + GAPY * (n.children.length - 1));
+  }
+  function place(n, x, y, side, depth){
+    pos.set(n.id, { x, y, w: n._w, h: n._h, side, depth });
+    bump(x, y, n._w, n._h);
+    if (n.collapsed || !n.children.length) return;
+    const kids = n.children;
+    const total = kids.reduce((s,c) => s + subH(c), 0) + GAPY * (kids.length - 1);
+    let cy = y - total / 2;
+    for (const c of kids){
+      const ch = subH(c);
+      const cyy = cy + ch / 2; cy += ch + GAPY;
+      const ccx = x + side * (n._w/2 + GAPX + c._w/2);
+      place(c, ccx, cyy, side, depth + 1);
+    }
+  }
+  // 根的子节点左右交替：偶数序号在右，奇数在左
+  const right = [], left = [];
+  doc.root.children.forEach((c, i) => (i % 2 === 0 ? right : left).push(c));
+  function placeSide(list, side){
+    if (!list.length) return;
+    const total = list.reduce((s,c) => s + subH(c), 0) + GAPY * (list.length - 1);
+    let cy = -total / 2;
+    for (const c of list){
+      const ch = subH(c);
+      const y = cy + ch / 2; cy += ch + GAPY;
+      const x = side * (doc.root._w/2 + GAPX + c._w/2);
+      place(c, x, y, side, 1);
+    }
+  }
+  pos.set(doc.root.id, { x: 0, y: 0, w: doc.root._w, h: doc.root._h, side: 0, depth: 0 });
+  bump(0, 0, doc.root._w, doc.root._h);
+  placeSide(right, +1);
+  placeSide(left, -1);
+  return ext;
+}
+
+/* ── 渲染 ─────────────────────────────── */
+function el(tag, attrs, parent){
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function render(){
+  measureAll();
+  const ext = layout();
+  gLinks.textContent = ""; gNodes.textContent = "";
+
+  // 连接线（折叠的分支不绘制）
+  (function drawLinks(n, side){
+    if (n.collapsed) return;
+    const p = pos.get(n.id);
+    for (const c of n.children){
+      const cp = pos.get(c.id);
+      if (!p || !cp) continue;
+      const s = p.side || cp.side;
+      const x1 = p.x + s * p.w/2, y1 = p.y;
+      const x2 = cp.x - s * cp.w/2, y2 = cp.y;
+      const dx = Math.max(20, Math.abs(x2 - x1) * 0.45) * s;
+      el("path", {
+        d: `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`,
+        fill: "none", stroke: "#57534b", "stroke-opacity": ".8",
+        "stroke-width": Math.max(1.4, 3.6 - (cp.depth||0) * 0.4)
+      }, gLinks);
+      drawLinks(c, s);
+    }
+  })(doc.root, 1);
+
+  // 节点
+  for (const n of visibleNodes()){
+    const p = pos.get(n.id);
+    const isRoot = n === doc.root;
+    const g = el("g", { class: "node" + (isRoot ? " root" : ""), transform: `translate(${p.x} ${p.y})` }, gNodes);
+    g.dataset.id = n.id;
+
+    el("rect", {
+      class: "box" + (sel === n.id ? " sel" : ""),
+      x: -p.w/2, y: -p.h/2, width: p.w, height: p.h, rx: 2,
+      fill: isRoot ? "#4b4741" : "#dcd8d1",
+      stroke: isRoot ? "#35322d" : (sel === n.id ? "#d9480f" : "#8f8a81"),
+      "stroke-width": sel === n.id ? 2.5 : (isRoot ? 2 : 1.2)
+    }, g);
+
+    if (n.mark) el("rect", { x: -p.w/2, y: -p.h/2, width: 4.5, height: p.h, fill: "#d9480f" }, g);
+
+    const t = el("text", {
+      "text-anchor": "middle", "font-family": isRoot ? FONT_ROOT : FONT_UI,
+      "font-size": isRoot ? 16 : 15, "font-weight": isRoot ? 600 : 400,
+      fill: isRoot ? "#ecebe7" : "#2c2925"
+    }, g);
+    const lh = n._lh, total = n._lines.length * lh;
+    n._lines.forEach((line, i) => {
+      const lineCenter = -total/2 + PADY + lh * (i + 0.5);
+      el("tspan", { x: 0, y: lineCenter + (isRoot ? 5.6 : 5.2) }, t).textContent = line;
+    });
+
+    // 折叠开关
+    if (n.children.length){
+      const s = p.side === 0 ? 1 : p.side;
+      const tog = el("g", { class: "tog", transform: `translate(${s*(p.w/2+11)} 0)` }, g);
+      tog.dataset.id = n.id;
+      el("circle", { r: 9, fill: "transparent" }, tog); // 命中区
+      if (n.collapsed){
+        const hc = hiddenCount(n);
+        el("circle", { r: 8, fill: "#b9b5ad", stroke: "#6e6a62", "stroke-width": 1 }, tog);
+        el("text", { "text-anchor": "middle", y: 3.2, "font-size": 9, "font-weight": 600,
+          "font-family": FONT_UI, fill: "#33302b" }, tog).textContent = hc > 99 ? "99+" : hc;
+      } else {
+        el("circle", { r: 3.2, fill: "none", stroke: "#6e6a62", "stroke-width": 1.4 }, tog);
+      }
+    }
+    wireNode(g, togEl => {});
+  }
+  // 每个 tog 的点击
+  gNodes.querySelectorAll(".tog").forEach(t => {
+    t.addEventListener("pointerdown", e => e.stopPropagation());
+    t.addEventListener("click", e => { e.stopPropagation(); toggleCollapse(+t.dataset.id); });
+  });
+
+  $("#tbNodes").textContent = countNodes();
+  updateUndoBtns();
+  if (editing) positionEditor();
+}
+function updateUndoBtns(){
+  $("#btnUndo").disabled = !undoStack.length;
+  $("#btnRedo").disabled = !redoStack.length;
+}
+function applyView(){
+  world.setAttribute("transform", `translate(${view.x} ${view.y}) scale(${view.z})`);
+  $("#tbZoom").textContent = Math.round(view.z * 100) + "%";
+  if (editing) positionEditor();
+}
+function fitView(){
+  const ext = layout();
+  const r = stage.getBoundingClientRect();
+  if (r.width < 50 || r.height < 50) return false;   // 舞台尚未布局
+  const w = ext.maxX - ext.minX, h = ext.maxY - ext.minY;
+  const z = Math.min((r.width - 120) / w, (r.height - 90) / h, 1.3);
+  view.z = Math.max(0.2, z);
+  view.x = r.width/2 - (ext.minX + w/2) * view.z;
+  view.y = r.height/2 - (ext.minY + h/2) * view.z;
+  applyView();
+  return true;
+}
+let didFit = false, userMovedView = false, lastStageW = 0, lastStageH = 0;
+function ensureFit(){
+  if (!doc) return;
+  try {
+    const r = stage.getBoundingClientRect();
+    if (r.width < 50 || r.height < 50) return;
+    if (!didFit || (!userMovedView &&
+        (Math.abs(r.width - lastStageW) > 40 || Math.abs(r.height - lastStageH) > 40))){
+      if (fitView()) didFit = true;
+    }
+    lastStageW = r.width; lastStageH = r.height;
+  } catch (e) { console.warn("ensureFit", e); }
+}
+new ResizeObserver(ensureFit).observe(stage);
+// 面板/窗口可见性时序兜底：直到适配成功为止轮询（rAF 在隐藏页面不触发）
+let fitTries = 0;
+function ensureFitLoop(){
+  if (didFit || ++fitTries > 200) return;
+  ensureFit();
+  if (!didFit) setTimeout(ensureFitLoop, 250);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) ensureFitLoop(); });
+function centerSel(){
+  const p = pos.get(sel);
+  if (!p) return;
+  const r = stage.getBoundingClientRect();
+  view.x = r.width/2 - p.x * view.z;
+  view.y = r.height/2 - p.y * view.z;
+  applyView();
+}
+
+/* ── 选中与编辑 ───────────────────────── */
+function select(id){ sel = id; render(); }
+function beginEdit(id){
+  const f = find(id); if (!f) return;
+  const p = pos.get(id);
+  editing = id; editOld = f.node.text;
+  editor.value = f.node.text;
+  editor.style.display = "block";
+  editor.style.fontFamily = f.node === doc.root ? FONT_ROOT.replace(/"/g, "'") : FONT_UI.replace(/"/g, "'");
+  positionEditor();
+  editor.focus(); editor.select();
+}
+function positionEditor(){
+  const p = pos.get(editing);
+  if (!p){ editor.style.display = "none"; return; }
+  const z = view.z;
+  editor.style.left   = (view.x + (p.x - p.w/2) * z) + "px";
+  editor.style.top    = (view.y + (p.y - p.h/2) * z) + "px";
+  editor.style.width  = (p.w * z) + "px";
+  editor.style.height = (p.h * z) + "px";
+  editor.style.fontSize = (15 * z) + "px";
+  editor.style.lineHeight = (LH * z) + "px";
+}
+function endEdit(ok){
+  if (editing == null) return;
+  const id = editing; editing = null;
+  editor.style.display = "none";
+  const f = find(id);
+  if (ok && f){
+    const t = editor.value.trim();
+    f.node.text = t === "" ? (f.node === doc.root ? "中心主题" : "新节点") : editor.value;
+    commit();
+  } else render();
+  editor.blur();
+}
+
+/* ── 节点操作 ─────────────────────────── */
+function addChild(pid, startEdit){
+  const f = find(pid); if (!f) return null;
+  const n = newNode("新节点");
+  f.node.collapsed = false;
+  f.node.children.push(n);
+  sel = n.id; commit();
+  if (startEdit) beginEdit(n.id);
+  return n.id;
+}
+function addSibling(id){
+  const f = find(id); if (!f) return null;
+  if (!f.parent) return addChild(id, true);
+  const n = newNode("新节点");
+  const sibs = f.parent.children;
+  sibs.splice(sibs.indexOf(f.node) + 1, 0, n);
+  sel = n.id; commit(); beginEdit(n.id);
+  return n.id;
+}
+function removeNode(id){
+  const f = find(id); if (!f) return;
+  if (!f.parent) return toast("中心主题不能删除");
+  const sibs = f.parent.children;
+  sibs.splice(sibs.indexOf(f.node), 1);
+  sel = f.parent.id; commit();
+}
+function toggleCollapse(id){
+  const f = find(id); if (!f || !f.node.children.length) return;
+  f.node.collapsed = !f.node.collapsed;
+  sel = id; commit();
+}
+function toggleMark(id){
+  const f = find(id); if (!f) return;
+  f.node.mark = !f.node.mark;
+  commit();
+}
+function reparent(id, newPid){
+  if (id === newPid) return false;
+  const f = find(id); const t = find(newPid);
+  if (!f || !t) return false;
+  if (isAncestor(f.node, newPid)) { toast("不能挂接到自己的子分支上"); return false; }
+  const sibs = f.parent.children;
+  sibs.splice(sibs.indexOf(f.node), 1);
+  t.node.collapsed = false;
+  t.node.children.push(f.node);
+  sel = id; commit();
+  toast("分支已挂接到「" + t.node.text.slice(0,12) + "」");
+  return true;
+}
+function copyBranch(id){
+  const f = find(id); if (!f) return;
+  clipBranch = JSON.parse(JSON.stringify(f.node));
+  toast("分支已复制（Ctrl+V 粘贴为子分支）");
+}
+function cloneFresh(n){
+  return { id: uid(), text: n.text, collapsed: false, mark: !!n.mark,
+           children: n.children.map(cloneFresh) };
+}
+function pasteBranch(id){
+  if (!clipBranch) return toast("剪贴板里没有分支");
+  const f = find(id); if (!f) return;
+  const c = cloneFresh(clipBranch);
+  f.node.collapsed = false;
+  f.node.children.push(c);
+  sel = c.id; commit();
+}
+
+/* ── 指针交互：平移 / 缩放 / 拖放挂接 ───── */
+let drag = null; // {mode, sx, sy, vx, vy, id, ghost, target}
+function svgPoint(e){
+  const r = svgEl.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function wireNode(g, onTog){
+  g.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    drag = { mode: "node", id: +g.dataset.id, sx: e.clientX, sy: e.clientY, moved: false,
+             ghost: null, target: null };
+  });
+  g.addEventListener("dblclick", e => { e.stopPropagation(); beginEdit(+g.dataset.id); });
+}
+svgEl.addEventListener("pointerdown", e => {
+  if (e.button !== 0 && e.button !== 1) return;
+  hideMenus();
+  const p = svgPoint(e);
+  drag = { mode: "pan", sx: p.x, sy: p.y, vx: view.x, vy: view.y, moved: false };
+  stage.classList.add("panning");
+});
+window.addEventListener("pointermove", e => {
+  if (!drag) return;
+  if (drag.mode === "pan"){
+    const p = svgPoint(e);
+    if (Math.abs(p.x - drag.sx) + Math.abs(p.y - drag.sy) > 3) drag.moved = true;
+    if (drag.moved){ userMovedView = true; view.x = drag.vx + p.x - drag.sx; view.y = drag.vy + p.y - drag.sy; applyView(); }
+  } else if (drag.mode === "node"){
+    if (!drag.moved){
+      if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) < 7) return;
+      drag.moved = true;
+      const g = gNodes.querySelector(`.node[data-id="${drag.id}"]`);
+      if (g){ g.style.pointerEvents = "none"; g.style.opacity = ".55"; drag.ghost = g; }
+      stage.classList.add("panning");
+    }
+    const dx = (e.clientX - drag.sx) / view.z, dy = (e.clientY - drag.sy) / view.z;
+    if (drag.ghost) drag.ghost.setAttribute("transform",
+      `translate(${pos.get(drag.id).x + dx} ${pos.get(drag.id).y + dy})`);
+    // 命中目标
+    if (drag.target){ const tr = gNodes.querySelector(`.node[data-id="${drag.target}"] rect.box`);
+      if (tr){ tr.setAttribute("stroke","#8f8a81"); tr.setAttribute("stroke-dasharray",""); } }
+    drag.target = null;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const tgl = hit && hit.closest ? hit.closest("#gNodes .node") : null;
+    if (tgl && +tgl.dataset.id !== drag.id){
+      drag.target = +tgl.dataset.id;
+      const tr = tgl.querySelector("rect.box");
+      tr.setAttribute("stroke", "#d9480f");
+      tr.setAttribute("stroke-dasharray", "5 3");
+    }
+  }
+});
+window.addEventListener("pointerup", e => {
+  if (!drag) return;
+  stage.classList.remove("panning");
+  if (drag.mode === "pan"){
+    if (!drag.moved && e.target === svgEl){ sel = null; render(); }
+  } else if (drag.mode === "node"){
+    if (!drag.moved){ select(drag.id); }
+    else {
+      const id = drag.id, tgt = drag.target;
+      if (tgt != null){
+        const f = find(id);
+        if (f && f.parent && f.parent.id === tgt) render();
+        else reparent(id, tgt);
+      } else render();
+    }
+  }
+  drag = null;
+});
+svgEl.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (editing) return;
+  userMovedView = true;
+  const p = svgPoint(e);
+  const f = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const nz = Math.min(3, Math.max(0.18, view.z * f));
+  view.x = p.x - (p.x - view.x) * (nz / view.z);
+  view.y = p.y - (p.y - view.y) * (nz / view.z);
+  view.z = nz;
+  applyView();
+}, { passive: false });
+
+editor.addEventListener("keydown", e => {
+  e.stopPropagation();
+  if (e.key === "Escape"){ endEdit(false); }
+  else if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); endEdit(true); }
+  else if (e.key === "Tab"){
+    e.preventDefault();
+    const id = editing;
+    endEdit(true);
+    if (e.shiftKey) addSibling(id); else addChild(id, true);
+  }
+});
+editor.addEventListener("blur", () => { if (editing != null) endEdit(true); });
+
+/* ── 键盘 ─────────────────────────────── */
+function navRight(){
+  const f = find(sel); if (!f) return;
+  const side = pos.get(sel).side || 1;
+  if (side > 0){
+    if (f.node.children.length){
+      if (f.node.collapsed){ f.node.collapsed = false; commit(); }
+      select(f.node.children[0].id);
+    }
+  } else if (f.parent) select(f.parent.id);
+}
+function navLeft(){
+  const f = find(sel); if (!f) return;
+  const side = pos.get(sel).side || -1;
+  if (side < 0){
+    if (f.node.children.length){
+      if (f.node.collapsed){ f.node.collapsed = false; commit(); }
+      select(f.node.children[0].id);
+    }
+  } else if (f.parent) select(f.parent.id);
+}
+function navVert(dir){
+  const cur = pos.get(sel); if (!cur) return;
+  const cands = visibleNodes()
+    .map(n => ({ n, p: pos.get(n.id) }))
+    .filter(o => o.n.id !== sel && (dir > 0 ? o.p.y > cur.y + 0.5 : o.p.y < cur.y - 0.5));
+  if (!cands.length) return;
+  cands.sort((a, b) => {
+    const da = (a.p.y - cur.y) * dir, db = (b.p.y - cur.y) * dir;
+    if (da !== db) return da - db;
+    return Math.abs(a.p.x - cur.x) - Math.abs(b.p.x - cur.x);
+  });
+  select(cands[0].n.id);
+}
+window.addEventListener("keydown", e => {
+  if ($("#modalWrap").classList.contains("show")){
+    if (e.key === "Escape") closeModal();
+    return;
+  }
+  if (editing) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === "z"){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === "y"){ e.preventDefault(); redo(); return; }
+  if (mod && e.key.toLowerCase() === "s"){ e.preventDefault(); exportJSON(); return; }
+  if (mod && e.key.toLowerCase() === "c"){ if (sel){ e.preventDefault(); copyBranch(sel); } return; }
+  if (mod && e.key.toLowerCase() === "v"){ if (sel){ e.preventDefault(); pasteBranch(sel); } return; }
+  if (mod && e.key.toLowerCase() === "d"){ if (sel){ e.preventDefault(); toggleMark(sel); } return; }
+  if (!sel) sel = doc.root.id;
+  switch (e.key){
+    case "Tab": e.preventDefault(); addChild(sel, true); break;
+    case "Enter": e.preventDefault(); addSibling(sel); break;
+    case "Delete": case "Backspace": e.preventDefault(); removeNode(sel); break;
+    case "F2": e.preventDefault(); beginEdit(sel); break;
+    case " ": e.preventDefault(); toggleCollapse(sel); break;
+    case "ArrowRight": e.preventDefault(); navRight(); break;
+    case "ArrowLeft": e.preventDefault(); navLeft(); break;
+    case "ArrowDown": e.preventDefault(); navVert(1); break;
+    case "ArrowUp": e.preventDefault(); navVert(-1); break;
+  }
+});
+
+/* ── 菜单 ─────────────────────────────── */
+function hideMenus(){ $("#exportMenu").classList.remove("show"); $("#ctxMenu").classList.remove("show"); }
+window.addEventListener("pointerdown", e => {
+  if (!e.target.closest(".menu") && !e.target.closest("#btnExport")) hideMenus();
+}, true);
+function showMenu(menu, x, y){
+  hideMenus();
+  menu.classList.add("show");
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
+  menu.style.top  = Math.min(y, innerHeight - r.height - 8) + "px";
+}
+function buildExportMenu(){
+  const m = $("#exportMenu");
+  m.textContent = "";
+  const items = [
+    ["JSON 数据（本工具完整格式）", exportJSON],
+    ["Markdown 大纲（.md）", exportMD],
+    ["FreeMind（.mm，可导入其他导图软件）", exportMM],
+    ["PNG 图像（2× 高清）", exportPNG],
+  ];
+  for (const [label, fn] of items){
+    const d = document.createElement("div");
+    d.className = "mi"; d.textContent = label;
+    d.onclick = () => { hideMenus(); fn(); };
+    m.appendChild(d);
+  }
+}
+$("#btnExport").addEventListener("click", e => {
+  e.stopPropagation();
+  const r = e.currentTarget.getBoundingClientRect();
+  buildExportMenu();
+  showMenu($("#exportMenu"), r.left, r.bottom + 6);
+});
+
+/* 右键菜单 */
+stage.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  const nodeEl = e.target.closest ? e.target.closest(".node") : null;
+  const m = $("#ctxMenu"); m.textContent = "";
+  const add = (label, k, fn, danger) => {
+    const d = document.createElement("div");
+    d.className = "mi" + (danger ? " danger" : "");
+    d.innerHTML = `<span></span><span class="k"></span>`;
+    d.firstChild.textContent = label; d.lastChild.textContent = k || "";
+    d.onclick = () => { hideMenus(); fn(); };
+    m.appendChild(d);
+  };
+  const sep = () => { const s = document.createElement("div"); s.className = "sep"; m.appendChild(s); };
+  if (nodeEl){
+    const id = +nodeEl.dataset.id;
+    sel = id; render();
+    const f = find(id);
+    add("编辑文字", "F2", () => beginEdit(id));
+    add("添加子主题", "Tab", () => addChild(id, true));
+    if (f.parent) add("添加同级主题", "Enter", () => addSibling(id));
+    sep();
+    add("复制分支", "Ctrl+C", () => copyBranch(id));
+    if (clipBranch) add("粘贴分支为子主题", "Ctrl+V", () => pasteBranch(id));
+    add(f.node.mark ? "取消重点标记" : "标记为重点", "Ctrl+D", () => toggleMark(id));
+    if (f.node.children.length) add(f.node.collapsed ? "展开分支" : "折叠分支", "Space", () => toggleCollapse(id));
+    sep();
+    add("删除节点", "Del", () => removeNode(id), true);
+  } else {
+    add("适应窗口", "", fitView);
+    add("折叠全部", "", collapseAll);
+    add("展开全部", "", expandAll);
+  }
+  showMenu(m, e.clientX, e.clientY);
+});
+
+/* ── 工具栏 ───────────────────────────── */
+$("#btnUndo").onclick = undo;
+$("#btnRedo").onclick = redo;
+$("#btnChild").onclick = () => sel && addChild(sel, true);
+$("#btnSibling").onclick = () => sel && addSibling(sel);
+$("#btnDelete").onclick = () => sel && removeNode(sel);
+$("#btnCollapse").onclick = collapseAll;
+$("#btnExpand").onclick = expandAll;
+$("#btnFit").onclick = fitView;
+$("#btnNew").onclick = () => {
+  if (countNodes() > 6 && !confirm("新建将替换当前导图（此操作不可撤销），继续？")) return;
+  newDocUI();
+};
+$("#btnHelp").onclick = () => openModal("helpModal");
+$("#btnShare").onclick = makeShareLink;
+$("#btnImport").onclick = () => $("#fileInput").click();
+
+function collapseAll(){
+  walk(n => { if (n !== doc.root && n.children.length) n.collapsed = true; });
+  commit();
+}
+function expandAll(){
+  walk(n => { n.collapsed = false; });
+  commit(); fitView();
+}
+function newDocUI(){
+  doc = defaultDoc();
+  sel = doc.root.id;
+  undoStack = []; redoStack = []; lastSnap = snapshot();
+  save(); render(); fitView();
+  toast("已新建导图");
+}
+
+/* ── 导入 / 导出 ──────────────────────── */
+function safeName(){
+  return (doc.root.text || "mindmap").replace(/[\\/:*?"<>|\n]+/g, "_").slice(0, 40) || "mindmap";
+}
+function download(name, blob){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+}
+function exportJSON(){
+  download(safeName() + ".json",
+    new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }));
+  toast("已导出 JSON");
+}
+function exportMD(){
+  const lines = ["# " + doc.root.text];
+  (function rec(n, d){
+    for (const c of n.children){
+      lines.push("  ".repeat(d) + "- " + c.text.replace(/\n/g, " "));
+      rec(c, d + 1);
+    }
+  })(doc.root, 1);
+  download(safeName() + ".md", new Blob([lines.join("\n")], { type: "text/markdown" }));
+  toast("已导出 Markdown");
+}
+function escXML(s){
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function exportMM(){
+  const lines = ['<map version="1.0.1">'];
+  (function rec(n, d){
+    const indent = "  ".repeat(d);
+    const folded = n.collapsed ? ' FOLDED="true"' : "";
+    if (n.children.length){
+      lines.push(`${indent}<node TEXT="${escXML(n.text)}"${folded}>`);
+      n.children.forEach(c => rec(c, d + 1));
+      lines.push(`${indent}</node>`);
+    } else {
+      lines.push(`${indent}<node TEXT="${escXML(n.text)}"${folded}/>`);
+    }
+  })(doc.root, 1);
+  lines.push("</map>");
+  download(safeName() + ".mm", new Blob([lines.join("\n")], { type: "text/xml" }));
+  toast("已导出 FreeMind .mm");
+}
+function buildStandaloneSVG(){
+  measureAll();
+  const ext = layout();
+  const M = 60;
+  const x = ext.minX - M, y = ext.minY - M;
+  const w = ext.maxX - ext.minX + M*2, h = ext.maxY - ext.minY + M*2;
+  const tmp = document.createElementNS(SVGNS, "svg");
+  tmp.setAttribute("xmlns", SVGNS);
+  tmp.setAttribute("width", w); tmp.setAttribute("height", h);
+  tmp.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+  el("rect", { x, y, width: w, height: h, fill: "#eceae6" }, tmp);
+  const wc = world.cloneNode(true);
+  wc.removeAttribute("transform");
+  tmp.appendChild(wc);
+  return { xml: new XMLSerializer().serializeToString(tmp), w, h };
+}
+async function exportPNG(){
+  toast("正在渲染 PNG…");
+  const { xml, w, h } = buildStandaloneSVG();
+  const img = new Image();
+  img.onload = () => {
+    const SC = 2;
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(w * SC); cv.height = Math.ceil(h * SC);
+    const cx = cv.getContext("2d");
+    cx.fillStyle = "#eceae6"; cx.fillRect(0, 0, cv.width, cv.height);
+    cx.drawImage(img, 0, 0, cv.width, cv.height);
+    // 图签：右下角标注
+    cx.strokeStyle = "#8f8c86"; cx.lineWidth = 1;
+    cx.strokeRect(cv.width - 300, cv.height - 46, 288, 34);
+    cx.beginPath(); cx.moveTo(cv.width - 300 + 96, cv.height - 46); cx.lineTo(cv.width - 300 + 96, cv.height - 12); cx.stroke();
+    cx.fillStyle = "#292722";
+    cx.font = `600 ${13*SC > 26 ? 26 : 15}px ${FONT_ROOT.replace(/"/g, "'")}`;
+    cx.fillText("THINKING MAP", cv.width - 288, cv.height - 24);
+    cx.font = "13px " + FONT_UI.replace(/"/g, "'");
+    cx.fillStyle = "#57544d";
+    const t = (doc.root.text || "").slice(0, 14);
+    const dd = new Date();
+    const dateStr = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+    cx.fillText(`${t} · ${dateStr}`, cv.width - 88, cv.height - 24);
+    cv.toBlob(b => { download(safeName() + ".png", b); toast("已导出 PNG"); }, "image/png");
+  };
+  img.onerror = () => toast("PNG 渲染失败");
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+}
+
+/* 导入 */
+$("#fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { loadFromText(String(rd.result), file.name); }
+    catch (err){ console.error(err); toast("导入失败：" + err.message); }
+  };
+  rd.readAsText(file, "utf-8");
+});
+function loadFromText(txt, name){
+  let d = null;
+  const t = txt.trim();
+  if (t.startsWith("{")){
+    const j = JSON.parse(t);
+    if (!j || !j.root || !Array.isArray(j.root.children)) throw new Error("不是有效的导图 JSON");
+    d = j;
+  } else if (t.startsWith("<")){
+    d = parseFreeMind(t);
+  } else {
+    d = parseMarkdown(t);
+  }
+  doc = normalizeDoc(d);
+  sel = doc.root.id;
+  undoStack = []; redoStack = []; lastSnap = snapshot();
+  save(); render(); fitView();
+  toast(`已导入「${name}」，共 ${countNodes()} 个节点`);
+}
+function normalizeDoc(d){
+  let maxId = 0;
+  (function rec(n){
+    if (n.id == null) n.id = 0;
+    maxId = Math.max(maxId, n.id);
+    n.children = Array.isArray(n.children) ? n.children : [];
+    n.collapsed = !!n.collapsed;
+    n.mark = !!n.mark;
+    n.children.forEach(rec);
+  })(d.root);
+  return {
+    app: "concrete-mindmap", version: 1,
+    title: d.title || "导入的导图",
+    root: d.root,
+    nextId: Math.max(d.nextId || 0, maxId + 1, 1)
+  };
+}
+function parseFreeMind(txt){
+  const xml = new DOMParser().parseFromString(txt, "text/xml");
+  if (xml.querySelector("parsererror")) throw new Error("FreeMind XML 解析失败");
+  const rootEl = xml.querySelector("map > node");
+  if (!rootEl) throw new Error("未找到 FreeMind 节点");
+  let nextId = 1;
+  function rec(el){
+    const n = { id: nextId++, text: el.getAttribute("TEXT") || "",
+                collapsed: el.getAttribute("FOLDED") === "true", mark: false, children: [] };
+    for (const c of el.children) if (c.tagName === "node") n.children.push(rec(c));
+    return n;
+  }
+  return { title: "FreeMind 导入", root: rec(rootEl), nextId };
+}
+function parseMarkdown(txt){
+  const items = [];
+  for (const raw of txt.split(/\r?\n/)){
+    const l = raw.replace(/\t/g, "  ");
+    if (!l.trim() || l.trim().startsWith("<!--")) continue;
+    let depth = null, text = null;
+    const b = l.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+    if (b){ depth = Math.floor(b[1].length / 2) + 1; text = b[3]; }
+    else {
+      const h = l.match(/^(#{1,6})\s+(.*)$/);
+      if (h){ depth = h[1].length; text = h[2]; }
+    }
+    if (depth == null) continue;
+    text = text.replace(/\*\*|__|`/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim();
+    if (text) items.push({ depth, text });
+  }
+  if (!items.length) throw new Error("未能从文本中识别出大纲（支持 # 标题与 - 列表）");
+  let nextId = 1;
+  const root = { id: nextId++, text: items[0].text, collapsed: false, mark: false, children: [] };
+  const stack = [{ depth: 0, node: root }];
+  for (const it of items.slice(1)){
+    let depth = it.depth;
+    while (stack.length > 1 && stack[stack.length-1].depth >= depth) stack.pop();
+    depth = Math.min(depth, stack[stack.length-1].depth + 1);
+    const n = { id: nextId++, text: it.text, collapsed: false, mark: false, children: [] };
+    stack[stack.length-1].node.children.push(n);
+    stack.push({ depth, node: n });
+  }
+  return { title: "Markdown 导入", root, nextId };
+}
+
+/* ── 分享链接（URL 内嵌压缩数据）──────── */
+function b64uFromBytes(bytes){
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function bytesFromB64u(str){
+  str = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (str.length % 4) str += "=";
+  const bin = atob(str);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function encodePayload(json){
+  const bytes = new TextEncoder().encode(json);
+  if (window.CompressionStream){
+    try {
+      const cs = new CompressionStream("deflate-raw");
+      const stream = new Blob([bytes]).stream().pipeThrough(cs);
+      const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+      return "d" + b64uFromBytes(buf);
+    } catch (e) { /* 落回明文 */ }
+  }
+  return "j" + b64uFromBytes(bytes);
+}
+async function decodePayload(payload){
+  const tag = payload[0], body = payload.slice(1);
+  const bytes = bytesFromB64u(body);
+  if (tag === "d" && window.DecompressionStream){
+    const ds = new DecompressionStream("deflate-raw");
+    const stream = new Blob([bytes]).stream().pipeThrough(ds);
+    const buf = await new Response(stream).arrayBuffer();
+    return new TextDecoder().decode(buf);
+  }
+  if (tag === "j") return new TextDecoder().decode(bytes);
+  throw new Error("未知的数据标记");
+}
+async function makeShareLink(){
+  openModal("shareModal");
+  $("#shareInput").value = "生成中…";
+  $("#shareInfo").textContent = "";
+  const json = JSON.stringify(doc);
+  const payload = await encodePayload(json);
+  const url = location.href.split("#")[0] + "#m=" + payload;
+  $("#shareInput").value = url;
+  const kb = (url.length / 1024).toFixed(1);
+  $("#shareInfo").innerHTML = `数据量：${countNodes()} 节点 · 链接长度 ${url.length.toLocaleString()} 字符（约 ${kb} KB）` +
+    (url.length > 60000 ? "<br><b style='color:#a33d12'>链接偏长，部分聊天工具可能截断，建议改用 JSON 文件分享。</b>" : "");
+}
+$("#btnCopyLink").onclick = async () => {
+  const v = $("#shareInput").value;
+  if (!v || v === "生成中…") return;
+  try { await navigator.clipboard.writeText(v); toast("分享链接已复制"); }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = v; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("分享链接已复制"); }
+    catch (e2){ toast("复制失败，请手动全选复制"); }
+    ta.remove();
+  }
+};
+async function loadFromHash(){
+  const m = location.hash.match(/^#m=([a-zA-Z0-9_-]+)/);
+  if (!m) return false;
+  try {
+    const json = await decodePayload(m[1]);
+    const d = JSON.parse(json);
+    if (!d || !d.root) throw new Error("数据不完整");
+    doc = normalizeDoc(d);
+    doc.title = d.title || "分享的导图";
+    sel = doc.root.id;
+    lastSnap = snapshot();
+    render();
+    ensureFitLoop();
+    toast("已载入分享的导图（" + countNodes() + " 节点）");
+    return true;
+  } catch (err){
+    console.error(err);
+    toast("分享链接数据解析失败");
+    return false;
+  }
+}
+
+window.addEventListener("hashchange", () => { if (location.hash.startsWith("#m=")) loadFromHash(); });
+
+/* ── 模态 / 提示 ──────────────────────── */
+function openModal(id){
+  $("#modalWrap").classList.add("show");
+  $("#modalWrap").querySelectorAll(".modal").forEach(m => m.style.display = "none");
+  $("#" + id).style.display = "block";
+}
+function closeModal(){ $("#modalWrap").classList.remove("show"); }
+$("#modalWrap").addEventListener("pointerdown", e => { if (e.target.id === "modalWrap") closeModal(); });
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = closeModal);
+
+let toastTimer = null;
+function toast(msg){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+/* ── 启动 ─────────────────────────────── */
+(async function init(){
+  const d = new Date();
+  $("#tbDate").textContent = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const fromHash = await loadFromHash();
+  if (!fromHash){
+    let restored = null;
+    try { restored = localStorage.getItem(LS_KEY); } catch (e) {}
+    if (restored){
+      try { doc = JSON.parse(restored); } catch (e) { doc = null; }
+    }
+    if (!doc || !doc.root){ doc = defaultDoc(); }
+    sel = doc.root.id;
+    lastSnap = snapshot();
+    if (restored) savedAt = new Date().toTimeString().slice(0,5);
+    $("#tbSaved").textContent = savedAt;
+    render();
+    ensureFitLoop();
+  }
+})();
+</script>
+</body>
+</html>
